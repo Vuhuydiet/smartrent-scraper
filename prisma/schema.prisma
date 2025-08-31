@@ -1,0 +1,198 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+// Models are organized in separate files for better maintainability:
+// - prisma/models/property.prisma - Property and PropertyImage models
+// - prisma/models/scraping.prisma - ScrapingJob, ScrapingLog, and ScrapingMetrics models
+//
+// Note: Prisma doesn't support file imports yet, but models are kept in separate files
+// for organization. When using the database, copy models here temporarily and regenerate.
+
+
+
+// Property-related models
+// This file contains models for properties and their associated data
+
+model ScrapedProperties {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Core identification
+  title       String  @map("title") @db.VarChar(500)
+  description String? @map("description") @db.Text
+
+  // Pricing information (flattened)
+  price               Float?  @map("price")
+  priceUnit          String? @map("price_unit") @db.VarChar(50)
+  currency           String  @map("currency") @db.VarChar(10)
+  pricePerPerson     Float?  @map("price_per_person")
+  deposit            Float?  @map("deposit")
+
+  // Additional fees (flattened)
+  parkingMotorcycleFee   Float? @map("parking_motorcycle_fee")
+  parkingScooterFee      Float? @map("parking_scooter_fee")
+  electricityRate        Float? @map("electricity_rate")
+  electricityAllowanceAC Float? @map("electricity_allowance_ac")
+  electricityAllowanceFan Float? @map("electricity_allowance_fan")
+
+  // Price variations (flattened)
+  regularRoomPrice       Float? @map("regular_room_price")
+  airConditionedRoomPrice Float? @map("air_conditioned_room_price")
+
+  // Location details (flattened)
+  address   String  @map("address") @db.VarChar(500)
+  city      String  @map("city") @db.VarChar(100)
+  district  String  @map("district") @db.VarChar(100)
+  ward      String  @map("ward") @db.VarChar(100)
+  street    String  @map("street") @db.VarChar(200)
+  country   String  @map("country") @db.VarChar(100)
+
+  // Vietnamese location IDs for precise mapping
+  cityCode   String? @map("city_code") @db.VarChar(10)
+  districtId Int?    @map("district_id")
+  wardId     Int?    @map("ward_id")
+  streetId   Int?    @map("street_id")
+
+  // Coordinates
+  latitude  Float? @map("latitude")
+  longitude Float? @map("longitude")
+
+  // Property specifications (flattened)
+  area         Float   @map("area") // in m²
+  bedrooms     Int?    @map("bedrooms")
+  bathrooms    Int?    @map("bathrooms")
+  direction    String? @map("direction") @db.VarChar(50)
+  furnishing   String? @map("furnishing") @db.VarChar(100)
+  propertyType String  @map("property_type") @db.VarChar(100)
+  roomCapacity Int?    @map("room_capacity")
+
+  // Features and amenities (JSON strings for MySQL storage)
+  features  String @map("features") @db.Text // JSON array as string
+  amenities String @map("amenities") @db.Text // JSON array as string
+
+  // Media (JSON strings for MySQL storage)
+  images      String  @map("images") @db.Text // JSON array of image URLs as string
+  videos      String? @map("videos") @db.Text // JSON array of video URLs as string
+  virtualTour String? @map("virtual_tour") @db.VarChar(500)
+
+  // Listing metadata (flattened)
+  listingId   String    @map("listing_id") @db.VarChar(100)
+  userId      String    @map("user_id") @db.VarChar(100)
+  postDate    DateTime  @map("post_date")
+  expiryDate  DateTime? @map("expiry_date")
+  listingType String    @map("listing_type") @db.VarChar(100)
+  vipType     Int?      @map("vip_type")
+  verified    Boolean?  @map("verified")
+  expired     Boolean?  @map("expired")
+  categoryId  Int?      @map("category_id")
+  productType Int?      @map("product_type")
+
+  // Source information
+  source    String @map("source") @db.VarChar(100)
+  sourceUrl String @unique @map("source_url") @db.VarChar(500)
+  scrapedAt DateTime @map("scraped_at")
+
+  // Additional Vietnamese-specific fields
+  nearbyLandmarks     String? @map("nearby_landmarks") @db.Text // JSON array as string
+  transportationInfo  String? @map("transportation_info") @db.Text // JSON array as string
+  targetAudience      String? @map("target_audience") @db.VarChar(200)
+
+  // Scraping metadata
+  isActive Boolean @default(true) @map("is_active")
+
+  // Indexes for better query performance
+  @@index([city, district, ward])
+  @@index([propertyType])
+  @@index([price])
+  @@index([area])
+  @@index([scrapedAt])
+  @@index([source])
+  @@index([listingId])
+  @@index([postDate])
+  @@map("scraped_properties")
+}
+
+// Note: ScrapedPropertyImages model removed since images are now stored as JSON in the main table
+
+
+// Scraping-related models
+// This file contains models for scraping jobs, logs, and metadata
+
+model ScrapingJobs {
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  // Job information
+  source      String   @db.VarChar(100) @map("source") // which scraper/source
+  status      String   @db.VarChar(20) @map("status")  // pending, running, completed, failed
+  
+  // Job configuration
+  config      Json?    // store scraper-specific configuration
+  
+  // Results
+  itemsFound     Int @default(0) @map("items_found")
+  itemsProcessed Int @default(0) @map("items_processed")
+  errors         Json? // store any errors that occurred
+  
+  // Timing
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  duration    Int?     // duration in seconds
+  
+  // Indexes for better query performance
+  @@index([status])
+  @@index([source])
+  @@index([createdAt])
+  @@map("scraping_jobs")
+}
+
+model ScrapingLogs {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now()) @map("created_at")
+  
+  level     String   @db.VarChar(10) @map("level") // info, warn, error, debug
+  message   String   @db.Text @map("message")
+  source    String   @db.VarChar(100) @map("source") // which scraper
+  metadata  Json?    // additional context data
+  
+  // Indexes for better query performance
+  @@index([level])
+  @@index([source])
+  @@index([createdAt])
+  @@map("scraping_logs")
+}
+
+model ScrapingMetrics {
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  // Metrics data
+  source      String   @db.VarChar(100) @map("source")
+  date        DateTime @db.Date @map("date")
+  
+  // Performance metrics
+  totalRequests       Int @default(0) @map("total_requests")
+  successfulRequests  Int @default(0) @map("successful_requests")
+  failedRequests      Int @default(0) @map("failed_requests")
+  averageResponseTime Float? @map("average_response_time") // in milliseconds
+  
+  // Data metrics
+  propertiesScraped Int @default(0) @map("properties_scraped")
+  duplicatesFound   Int @default(0) @map("duplicates_found")
+  
+  @@unique([source, date])
+  @@index([source])
+  @@index([date])
+  @@map("scraping_metrics")
+}

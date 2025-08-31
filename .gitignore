@@ -1,3 +1,8 @@
+tmp/
+.ignore/
+diff/
+data/
+
 # Logs
 logs
 *.log
@@ -137,3 +142,8 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Prisma
+# Note: migrations are tracked in version control for deployment consistency
+
+/src/generated/prisma
