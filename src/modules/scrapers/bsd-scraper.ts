@@ -3,8 +3,7 @@ import { IScraper } from './scraper.interface';
 import { PropertyDto } from '../../dto';
 import { Logger, ScraperUtils } from '../../utils';
 import { WebsiteCode } from '../../utils/constants';
-import * as fs from 'fs';
-import * as path from 'path';
+import { URL } from 'url'
 
 export class BSDScraper implements IScraper {
   private logger = new Logger(BSDScraper.name);
@@ -72,6 +71,13 @@ export class BSDScraper implements IScraper {
       // Fallback to scraping just the first page
       return this.scrapePropertyList(firstListUrl);
     }
+  }
+
+  getPageUrl(listUrl: string, page: number): string {
+    const url = new URL(listUrl);
+    url.pathname += '/p' + page;
+
+    return url.toString();
   }
 
   async scrapePropertyList(url: string): Promise<PropertyDto[]> {

@@ -7,6 +7,8 @@ import { ScrapingLogService } from './scraping-log.service';
 
 import type { WebsiteCode, ExporterType } from '../utils/constants';
 import { ScrapingJobRequest } from '../dto/request/scraping-job.dto';
+import { PropertyDto } from '../dto';
+import { ScraperUtils } from '../utils';
 
 export interface JobListOptions {
   status?: string;
@@ -48,10 +50,10 @@ export class ScrapingJobService {
   private startBackgroundJob(jobId: string, scrapingJob: ScrapingJobRequest): void {
     // Create promise for background processing
     const jobPromise = this.processScrapingJob(jobId, scrapingJob);
-    
+
     // Store running job
     this.runningJobs.set(jobId, jobPromise);
-    
+
     // Clean up when job completes
     jobPromise.finally(() => {
       this.runningJobs.delete(jobId);
@@ -63,10 +65,10 @@ export class ScrapingJobService {
   private async processScrapingJob(jobId: string, scrapingJob: ScrapingJobRequest): Promise<void> {
     // Get exporters for this specific job
     const exporters = ExporterFactory.getExporters(scrapingJob.exporters as ExporterType[]);
-    
+
     // Get scraper
     const scraper = ScraperFactory.getScraper(scrapingJob.websiteCode as WebsiteCode);
-    
+
     try {
       // Mark job as running
       await this.jobManagementService.updateScrapingJob(jobId, {
@@ -82,35 +84,49 @@ export class ScrapingJobService {
 
       // Initialize scraper and scrape the URL
       await scraper.initialize();
-      const scrapedProperties = await scraper.scrapeAllPropertiesFromFirstPage(scrapingJob.url, scrapingJob.start, scrapingJob.limit);
 
-      for (const exporter of exporters) {
+      const { url, start, limit } = scrapingJob;
+      this.logger.info(`Starting to scrape all properties from: ${url}`);
+
+      // Get total number of pages
+      const totalPages = await scraper.getTotalPages(url);
+      this.logger.info(`Found ${totalPages} pages to scrape`);
+
+      let totalProperties = 0
+      // Iterate through all pages
+      for (let pageNum = start; pageNum <= totalPages && (pageNum - start + 1 <= limit); pageNum++) {
         try {
-          await exporter.exportProperties(scrapedProperties);
-          this.logger.info(`Successfully exported ${scrapedProperties.length} properties using ${exporter.getExporterType()}`);
-        } catch (error) {
-          this.logger.error(`${exporter.getExporterType()} export failed:`, error as Error);
-          // Log the export error but don't fail the entire job
-          await this.scrapingLogService.logScrapingEvent(
-            'error',
-            `Export failed for ${exporter.getExporterType()}`,
-            'job-service',
-            { 
-              jobId, 
-              url: scrapingJob.url, 
-              websiteCode: scrapingJob.websiteCode,
-              exporter: exporter.getExporterType(),
-              error: error instanceof Error ? error.message : String(error) 
-            }
-          );
+          // Construct URL for each page
+          const pageUrl = scraper.getPageUrl(url, pageNum);
+
+          this.logger.info(`Scraping page ${pageNum}/${totalPages}: ${pageUrl}`);
+
+          // Scrape properties from current page
+          const pageProperties = await scraper.scrapePropertyList(pageUrl);
+          this.logger.info(`Page ${pageNum} completed: ${pageProperties.length} properties found`);
+
+          totalProperties += pageProperties.length;
+
+          await this.exportData(jobId, pageProperties, exporters);
+
+          // Add delay between pages to be respectful
+          if (pageNum < totalPages) {
+            await ScraperUtils.sleep(3000); // 3 second delay between pages
+          }
+
+        } catch (pageError) {
+          this.logger.error(`Failed to scrape page ${pageNum}`, pageError as Error);
+          // Continue with next page instead of stopping completely
         }
       }
+
+      this.logger.info(`Completed scraping all pages. Total properties found: ${totalProperties}`);
 
       // Mark job as completed with results
       await this.jobManagementService.updateScrapingJob(jobId, {
         status: 'completed',
-        itemsFound: scrapedProperties.length,
-        itemsProcessed: scrapedProperties.length
+        itemsFound: totalProperties,
+        itemsProcessed: totalProperties,
       });
 
       await this.scrapingLogService.logScrapingEvent(
@@ -138,18 +154,40 @@ export class ScrapingJobService {
         'error',
         'Scraping job failed',
         'job-service',
-        { 
-          jobId, 
-          url: scrapingJob.url, 
+        {
+          jobId,
+          url: scrapingJob.url,
           websiteCode: scrapingJob.websiteCode,
           exporters: scrapingJob.exporters,
-          error: error instanceof Error ? error.message : String(error) 
+          error: error instanceof Error ? error.message : String(error)
         }
       );
     } finally {
       // Cleanup scraper
       await scraper.cleanup();
       this.logger.debug(`Job ${jobId} for ${scrapingJob.websiteCode} processing completed`);
+    }
+  }
+
+  private async exportData(jobId: string, properties: PropertyDto[], exporters: any[]): Promise<void> {
+    for (const exporter of exporters) {
+      try {
+        await exporter.exportProperties(properties);
+        this.logger.info(`Successfully exported ${properties.length} properties using ${exporter.getExporterType()}`);
+      } catch (error) {
+        this.logger.error(`${exporter.getExporterType()} export failed:`, error as Error);
+        // Log the export error but don't fail the entire job
+        await this.scrapingLogService.logScrapingEvent(
+          'error',
+          `Export failed for ${exporter.getExporterType()}`,
+          'job-service',
+          {
+            jobId,
+            exporter: exporter.getExporterType(),
+            error: error instanceof Error ? error.message : String(error)
+          }
+        );
+      }
     }
   }
 
@@ -163,7 +201,7 @@ export class ScrapingJobService {
 
       // Add runtime status for running jobs
       const isRunning = this.runningJobs.has(jobId);
-      
+
       return {
         ...job,
         isCurrentlyRunning: isRunning,
@@ -201,7 +239,7 @@ export class ScrapingJobService {
     try {
       // Get database exporter for property statistics
       const dbExporter = ExporterFactory.getExporter('database' as ExporterType) as any;
-      
+
       const [jobStats, propertyStats] = await Promise.all([
         this.jobManagementService.getJobStatistics(),
         dbExporter.getPropertyStatistics()

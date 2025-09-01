@@ -25,6 +25,10 @@ export interface IScraper {
    */
   scrapeAllPropertiesFromFirstPage(firstListUrl: string, start: number, limit: number): Promise<PropertyDto[]>;
 
+  getPageUrl(listUrl: string, page: number): string;
+
+  getTotalPages(listUrl: string): Promise<number>;
+  
   /**
    * Clean up resources (close browser, etc.)
    */
