@@ -1,6 +1,6 @@
 import { PrismaClient } from '../generated/prisma';
 import { ScraperFactory } from '../modules/scrapers';
-import { ExporterFactory } from '../modules/exporters';
+import { ExporterFactory, IExporter } from '../modules/exporters';
 import { Logger } from '../utils/logger';
 import { JobManagementService } from './job-management.service';
 import { ScrapingLogService } from './scraping-log.service';
@@ -41,7 +41,7 @@ export class ScrapingJobService {
       this.startBackgroundJob(jobId, scrapingJob);
 
       return jobId;
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error('Failed to create scraping job:', error as Error);
       throw error;
     }
@@ -138,7 +138,7 @@ export class ScrapingJobService {
 
       this.logger.info(`Job ${jobId} for ${scrapingJob.websiteCode} completed successfully with exporters: ${scrapingJob.exporters.join(', ')}`);
 
-    } catch (error: any) {
+    } catch (error) {
       this.logger.error(`Job ${jobId} for ${scrapingJob.websiteCode} failed:`, error as Error);
 
       // Mark job as failed
@@ -169,7 +169,7 @@ export class ScrapingJobService {
     }
   }
 
-  private async exportData(jobId: string, properties: PropertyDto[], exporters: any[]): Promise<void> {
+  private async exportData(jobId: string, properties: PropertyDto[], exporters: IExporter[]): Promise<void> {
     for (const exporter of exporters) {
       try {
         await exporter.exportProperties(properties);

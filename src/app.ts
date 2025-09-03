@@ -2,7 +2,7 @@ import express, { Application, Request, Response } from 'express';
 import { Logger } from './utils/logger';
 import { ScrapingJobService } from './service';
 import { Config } from './config';
-import { createRoutes } from './routes';
+import { createRoutes } from './route';
 
 export class ExpressApp {
   private app: Application;

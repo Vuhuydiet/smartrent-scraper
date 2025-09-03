@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { ScrapingController } from '../controllers/scraping.controller';
+import { ScrapingController } from '../controller/scraping.controller';
 import { ScrapingJobService } from '../service';
 
 /**

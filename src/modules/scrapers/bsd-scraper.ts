@@ -5,6 +5,33 @@ import { Logger, ScraperUtils } from '../../utils';
 import { WebsiteCode } from '../../utils/constants';
 import { URL } from 'url'
 
+// Interface for listing metadata
+interface ListingMetadata {
+  listingId: string;
+  userId: string;
+  postDate: string;
+  expiryDate?: string;
+  listingType: string;
+  vipType?: string;
+  verified?: boolean;
+  expired?: boolean;
+  categoryId?: string | number;
+  productType?: string;
+}
+
+// Interface for pricing details
+interface PricingDetails {
+  pricePerPerson?: number;
+  deposit?: number;
+  parkingMotorcycleFee?: number;
+  parkingScooterFee?: number;
+  electricityRate?: number;
+  electricityAllowanceAC?: number;
+  electricityAllowanceFan?: number;
+  regularRoomPrice?: number;
+  airConditionedRoomPrice?: number;
+}
+
 export class BSDScraper implements IScraper {
   private logger = new Logger(BSDScraper.name);
   private browser?: Browser;
@@ -298,7 +325,7 @@ export class BSDScraper implements IScraper {
 
       const property: PropertyDto = {
         // Core identification
-        id: structuredData?.identifier || this.generatePropertyId(url, title),
+        id: (structuredData?.identifier as string) || this.generatePropertyId(url, title),
         title: title || 'Untitled Property',
         description: description || undefined,
         
@@ -359,14 +386,14 @@ export class BSDScraper implements IScraper {
         // Listing metadata (flattened)
         listingId: listingMetadata.listingId,
         userId: listingMetadata.userId,
-        postDate: listingMetadata.postDate,
-        expiryDate: listingMetadata.expiryDate,
+        postDate: new Date(listingMetadata.postDate),
+        expiryDate: listingMetadata.expiryDate ? new Date(listingMetadata.expiryDate) : undefined,
         listingType: listingMetadata.listingType,
-        vipType: listingMetadata.vipType,
+        vipType: typeof listingMetadata.vipType === 'string' ? parseInt(listingMetadata.vipType) || undefined : listingMetadata.vipType,
         verified: listingMetadata.verified,
         expired: listingMetadata.expired,
-        categoryId: listingMetadata.categoryId,
-        productType: listingMetadata.productType,
+        categoryId: typeof listingMetadata.categoryId === 'string' ? parseInt(listingMetadata.categoryId) || undefined : listingMetadata.categoryId,
+        productType: typeof listingMetadata.productType === 'string' ? parseInt(listingMetadata.productType) || undefined : listingMetadata.productType,
         
         // Source information
         source: 'batdongsan.com.vn',
@@ -461,7 +488,7 @@ export class BSDScraper implements IScraper {
 
         // Check for coordinates in JavaScript variables
         const scripts = Array.from(document.querySelectorAll('script'));
-        for (const script of scripts as any[]) {
+        for (const script of scripts) {
           if (script.textContent) {
             const latMatch = script.textContent.match(/latitude['":\s]+([0-9.-]+)/);
             const lngMatch = script.textContent.match(/longitude['":\s]+([0-9.-]+)/);
@@ -533,7 +560,7 @@ export class BSDScraper implements IScraper {
     return { features, amenities };
   }
 
-  private async extractListingMetadata(page: Page): Promise<any> {
+  private async extractListingMetadata(page: Page): Promise<ListingMetadata> {
     try {
       return await page.evaluate(() => {
         // Extract from page tracking data or other metadata
@@ -586,7 +613,7 @@ export class BSDScraper implements IScraper {
     }
   }
 
-  private async extractStructuredData(page: Page): Promise<any> {
+  private async extractStructuredData(page: Page): Promise<Record<string, unknown> | null> {
     try {
       return await page.evaluate(() => {
         const jsonLdScript = document.querySelector('script[type="application/ld+json"]');
@@ -600,8 +627,8 @@ export class BSDScraper implements IScraper {
     }
   }
 
-  private extractPricingDetails(description: string): any {
-    const details: any = {};
+  private extractPricingDetails(description: string): PricingDetails {
+    const details: PricingDetails = {};
 
     // Extract pricing information from description
     const regularRoomMatch = description.match(/phòng thường[^:]*:\s*từ\s*([\d,]+)/i);
@@ -647,7 +674,7 @@ export class BSDScraper implements IScraper {
     try {
       return await page.evaluate(() => {
         const scripts = Array.from(document.querySelectorAll('script'));
-        for (const script of scripts as any[]) {
+        for (const script of scripts) {
           if (script.textContent?.includes('districtId')) {
             const match = script.textContent.match(/districtId['":\s]+(\d+)/);
             if (match) return parseInt(match[1]);
@@ -664,7 +691,7 @@ export class BSDScraper implements IScraper {
     try {
       return await page.evaluate(() => {
         const scripts = Array.from(document.querySelectorAll('script'));
-        for (const script of scripts as any[]) {
+        for (const script of scripts) {
           if (script.textContent?.includes('wardId')) {
             const match = script.textContent.match(/wardId['":\s]+(\d+)/);
             if (match) return parseInt(match[1]);
@@ -681,7 +708,7 @@ export class BSDScraper implements IScraper {
     try {
       return await page.evaluate(() => {
         const scripts = Array.from(document.querySelectorAll('script'));
-        for (const script of scripts as any[]) {
+        for (const script of scripts) {
           if (script.textContent?.includes('streetId')) {
             const match = script.textContent.match(/streetId['":\s]+(\d+)/);
             if (match) return parseInt(match[1]);

@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import { ScrapingJobService } from '../service';
 import { CreateScrapingJobRequestSchema, JobListQuerySchema } from '../dto';
 import { Logger } from '../utils/logger';
-import type { WebsiteCode } from '../utils/constants';
 
 /**
  * Scraping operations controller
