@@ -155,7 +155,7 @@ jobs:
     - name: Set environment variables
       id: env
       run: |
-        COMMIT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-8)
+        COMMIT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
         ENVIRONMENT=$([[ "${GITHUB_REF}" == "refs/heads/main" ]] && echo "prd" || echo "dev")
         VALUES_FILE="charts/smartrent/environments/${ENVIRONMENT}/values.yaml"
 

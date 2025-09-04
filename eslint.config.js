@@ -43,7 +43,7 @@ module.exports = [
   },
   {
     // Special configuration for scraper files that use Puppeteer
-    files: ['**/scrapers/*.ts', '**/modules/scrapers/*.ts'],
+    files: ['**/modules/scrapers/*.ts', '**/utils/scraper-utils.ts'],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
@@ -67,6 +67,7 @@ module.exports = [
         // DOM globals for Puppeteer browser context
         document: 'readonly',
         window: 'readonly',
+        navigator: 'readonly',
       },
     },
     plugins: {

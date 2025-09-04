@@ -79,6 +79,7 @@ export class ScraperUtils {
       const originalQuery = window.navigator.permissions.query;
       window.navigator.permissions.query = (parameters: any) => (
         parameters.name === 'notifications' ?
+          // eslint-disable-next-line no-undef
           Promise.resolve({ state: Notification.permission } as any) :
           originalQuery(parameters)
       );
